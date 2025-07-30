@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAML Test Service Provider</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .success { color: green; background: #f0f8f0; padding: 10px; border-radius: 5px; }
+        .error { color: red; background: #f8f0f0; padding: 10px; border-radius: 5px; }
+        .info { color: blue; background: #f0f0f8; padding: 10px; border-radius: 5px; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
+        textarea { width: 100%; height: 200px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>SAML Test Service Provider</h1>
+    <p>This is a mock SAML Service Provider for testing SAML authentication flows.</p>
+    
+    <div id="status" class="info">
+        Status: Ready for testing
+    </div>
+    
+    <h2>Test Actions</h2>
+    <button onclick="testIdpMetadata()">Test IdP Metadata</button>
+    <button onclick="generateAuthRequest()">Generate SAML AuthnRequest</button>
+    <button onclick="testSamlResponse()">Test SAML Response Handler</button>
+    
+    <h2>Configuration</h2>
+    <pre id="config">
+Entity ID: saml-test-sp
+ACS URL: http://localhost:8081/acs
+Keycloak IdP URL: http://localhost:8080
+Realm: test-realm
+Binding: HTTP-POST
+</pre>
+    
+    <h2>Results</h2>
+    <div id="results"></div>
+    
+    <script>
+        const KEYCLOAK_URL = 'http://localhost:8080';
+        const REALM = 'test-realm';
+        const SP_ENTITY_ID = 'saml-test-sp';
+        const ACS_URL = 'http://localhost:8081/acs';
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = type;
+            status.textContent = message;
+        }
+        
+        function updateResults(content) {
+            document.getElementById('results').innerHTML = content;
+        }
+        
+        async function testIdpMetadata() {
+            updateStatus('Testing IdP Metadata...', 'info');
+            
+            try {
+                const response = await fetch(`${KEYCLOAK_URL}/realms/${REALM}/protocol/saml/descriptor`);
+                
+                if (response.ok) {
+                    const metadata = await response.text();
+                    updateStatus('IdP Metadata retrieved successfully', 'success');
+                    updateResults(`
+                        <h3>SAML IdP Metadata</h3>
+                        <textarea readonly>${metadata}</textarea>
+                        <p><em>This metadata would be used to configure the SP trust relationship</em></p>
+                    `);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                updateStatus(`IdP Metadata failed: ${error.message}`, 'error');
+                updateResults(`<p class="error">Error: ${error.message}</p>`);
+            }
+        }
+        
+        function generateAuthRequest() {
+            updateStatus('Generating SAML AuthnRequest...', 'info');
+            
+            const requestId = 'test-request-' + Date.now();
+            const issueInstant = new Date().toISOString();
+            
+            const samlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<samlp:AuthnRequest 
+    xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+    ID="${requestId}"
+    Version="2.0"
+    IssueInstant="${issueInstant}"
+    Destination="${KEYCLOAK_URL}/realms/${REALM}/protocol/saml"
+    AssertionConsumerServiceURL="${ACS_URL}"
+    ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+    <saml:Issuer>${SP_ENTITY_ID}</saml:Issuer>
+    <samlp:NameIDPolicy 
+        Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+        AllowCreate="true"/>
+</samlp:AuthnRequest>`;
+            
+            // Base64 encode for HTTP-POST binding
+            const encoded = btoa(samlRequest);
+            
+            updateStatus('SAML AuthnRequest generated', 'success');
+            updateResults(`
+                <h3>SAML AuthnRequest</h3>
+                <h4>Raw XML:</h4>
+                <textarea readonly>${samlRequest}</textarea>
+                
+                <h4>Base64 Encoded (for HTTP-POST):</h4>
+                <textarea readonly>${encoded}</textarea>
+                
+                <h4>Test Form:</h4>
+                <form method="POST" action="${KEYCLOAK_URL}/realms/${REALM}/protocol/saml" target="_blank">
+                    <input type="hidden" name="SAMLRequest" value="${encoded}">
+                    <input type="hidden" name="RelayState" value="test-relay-state">
+                    <button type="submit">Send SAML Request to Keycloak</button>
+                </form>
+                <p><em>This form would initiate SAML SSO flow</em></p>
+            `);
+        }
+        
+        function testSamlResponse() {
+            updateStatus('Testing SAML Response Handler...', 'info');
+            
+            // Check if we have SAML Response in the page (POST data simulation)
+            const urlParams = new URLSearchParams(window.location.search);
+            const samlResponse = urlParams.get('SAMLResponse');
+            const relayState = urlParams.get('RelayState');
+            
+            if (samlResponse) {
+                try {
+                    // Decode the SAML Response (in real implementation, this would be properly parsed and validated)
+                    const decoded = atob(samlResponse);
+                    
+                    updateStatus('SAML Response processed', 'success');
+                    updateResults(`
+                        <h3>SAML Response Received</h3>
+                        <p><strong>RelayState:</strong> ${relayState || 'None'}</p>
+                        
+                        <h4>Decoded SAML Response:</h4>
+                        <textarea readonly>${decoded}</textarea>
+                        
+                        <div class="success">
+                            <p><strong>Authentication Successful!</strong></p>
+                            <p>In a real application, the assertion would be validated and a user session created.</p>
+                        </div>
+                    `);
+                } catch (error) {
+                    updateStatus('Failed to decode SAML Response', 'error');
+                    updateResults(`<p class="error">Error decoding SAML Response: ${error.message}</p>`);
+                }
+            } else {
+                updateStatus('No SAML Response found', 'info');
+                updateResults(`
+                    <h3>SAML Response Handler</h3>
+                    <p>No SAML Response found in current request.</p>
+                    <p>To test this handler:</p>
+                    <ol>
+                        <li>Generate and send a SAML AuthnRequest first</li>
+                        <li>Complete authentication in Keycloak</li>
+                        <li>Keycloak will POST the SAML Response back to this endpoint</li>
+                    </ol>
+                    
+                    <p>Or simulate by adding <code>?SAMLResponse=base64encoded&RelayState=test</code> to the URL</p>
+                    
+                    <h4>Example POST form (for testing):</h4>
+                    <form method="GET" action="">
+                        <label>SAML Response (Base64):</label><br>
+                        <textarea name="SAMLResponse" placeholder="Paste base64-encoded SAML Response here"></textarea><br>
+                        <label>RelayState:</label><br>
+                        <input type="text" name="RelayState" value="test-relay-state"><br><br>
+                        <button type="submit">Simulate SAML Response</button>
+                    </form>
+                `);
+            }
+        }
+        
+        // Handle ACS endpoint simulation
+        if (window.location.pathname.includes('/acs')) {
+            testSamlResponse();
+        }
+        
+        // Auto-test SAML response if parameters are present
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('SAMLResponse')) {
+                testSamlResponse();
+            }
+        });
+    </script>
+</body>
+</html>

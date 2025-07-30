@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OIDC Test Client</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .success {
+        color: green;
+        background: #f0f8f0;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      .error {
+        color: red;
+        background: #f8f0f0;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      .info {
+        color: blue;
+        background: #f0f0f8;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 10px 0;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OIDC Test Client</h1>
+    <p>
+      This is a mock OIDC client application for testing authentication flows.
+    </p>
+
+    <div id="status" class="info">Status: Ready for testing</div>
+
+    <h2>Test Actions</h2>
+    <button onclick="testOIDCDiscovery()">Test OIDC Discovery</button>
+    <button onclick="startAuthFlow()">Start Auth Flow</button>
+    <button onclick="testCallback()">Test Callback Handler</button>
+
+    <h2>Configuration</h2>
+    <pre id="config">
+Client ID: oidc-test-client
+Redirect URI: https://localhost:8082/callback
+Keycloak URL: https://localhost
+Realm: test-realm
+</pre
+    >
+
+    <h2>Results</h2>
+    <div id="results"></div>
+
+    <script>
+      const KEYCLOAK_URL = "http://localhost:8080";
+      const REALM = "test-realm";
+      const CLIENT_ID = "oidc-test-client";
+      const REDIRECT_URI = "https://localhost:8082/callback";
+
+      function updateStatus(message, type = "info") {
+        const status = document.getElementById("status");
+        status.className = type;
+        status.textContent = message;
+      }
+
+      function updateResults(content) {
+        document.getElementById("results").innerHTML = content;
+      }
+
+      async function testOIDCDiscovery() {
+        updateStatus("Testing OIDC Discovery...", "info");
+
+        try {
+          const response = await fetch(
+            `${KEYCLOAK_URL}/realms/${REALM}/.well-known/openid_configuration`
+          );
+
+          if (response.ok) {
+            const config = await response.json();
+            updateStatus("OIDC Discovery successful", "success");
+            updateResults(`
+                        <h3>OIDC Configuration</h3>
+                        <pre>${JSON.stringify(config, null, 2)}</pre>
+                    `);
+          } else {
+            throw new Error(`HTTP ${response.status}`);
+          }
+        } catch (error) {
+          updateStatus(`OIDC Discovery failed: ${error.message}`, "error");
+          updateResults(`<p class="error">Error: ${error.message}</p>`);
+        }
+      }
+
+      function startAuthFlow() {
+        updateStatus("Starting Authorization Code Flow...", "info");
+
+        const authUrl = new URL(
+          `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/auth`
+        );
+        authUrl.searchParams.set("client_id", CLIENT_ID);
+        authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
+        authUrl.searchParams.set("response_type", "code");
+        authUrl.searchParams.set("scope", "openid profile email");
+        authUrl.searchParams.set("state", "test-state-" + Date.now());
+
+        updateResults(`
+                <h3>Authorization URL Generated</h3>
+                <p>In a real application, the user would be redirected to:</p>
+                <p><a href="${authUrl.href}" target="_blank">${authUrl.href}</a></p>
+                <p><em>Note: This will redirect to Keycloak login page</em></p>
+            `);
+      }
+
+      function testCallback() {
+        updateStatus("Testing Callback Handler...", "info");
+
+        // Check if we have authorization code in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+        const state = urlParams.get("state");
+        const error = urlParams.get("error");
+
+        if (error) {
+          updateStatus(`OAuth error: ${error}`, "error");
+          updateResults(`<p class="error">OAuth Error: ${error}</p>`);
+          return;
+        }
+
+        if (code) {
+          updateStatus("Authorization code received", "success");
+          updateResults(`
+                    <h3>Authorization Code Received</h3>
+                    <p><strong>Code:</strong> ${code}</p>
+                    <p><strong>State:</strong> ${state}</p>
+                    <p><em>In a real application, this would be exchanged for tokens</em></p>
+                `);
+        } else {
+          updateStatus("No authorization code found in URL", "info");
+          updateResults(`
+                    <h3>Callback Test</h3>
+                    <p>No authorization code found in current URL.</p>
+                    <p>Complete the authorization flow first, or append <code>?code=test&state=test</code> to the URL to simulate.</p>
+                `);
+        }
+      }
+
+      // Auto-test callback if parameters are present
+      window.addEventListener("load", function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("code") || urlParams.get("error")) {
+          testCallback();
+        }
+      });
+    </script>
+  </body>
+</html>

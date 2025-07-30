@@ -1,0 +1,192 @@
+{
+  "id": "test-realm",
+  "realm": "test-realm",
+  "displayName": "Test Realm",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 30,
+  "defaultRoles": ["offline_access", "uma_authorization"],
+  "requiredCredentials": ["password"],
+  "passwordPolicy": "hashIterations(27500)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "clients": [
+    {
+      "id": "oidc-test-client",
+      "clientId": "oidc-test-client",
+      "name": "OIDC Test Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "oidc-test-secret",
+      "redirectUris": [
+        "http://localhost:8082/*",
+        "https://localhost:8082/*",
+        "http://oidc-client/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8082",
+        "https://localhost:8082",
+        "http://oidc-client"
+      ],
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "attributes": {
+        "saml.assertion.signature": "false",
+        "saml.force.post.binding": "false",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "false",
+        "saml.server.signature.keyinfo.ext": "false",
+        "exclude.session.state.from.auth.response": "false",
+        "saml.onetimeuse.condition": "false",
+        "saml_force_name_id_format": "false",
+        "saml.client.signature": "false",
+        "tls.client.certificate.bound.access.tokens": "false",
+        "saml.authnstatement": "false",
+        "display.on.consent.screen": "false",
+        "saml.signature.algorithm": "RSA_SHA256"
+      }
+    },
+    {
+      "id": "saml-test-sp",
+      "clientId": "saml-test-sp",
+      "name": "SAML Test Service Provider",
+      "enabled": true,
+      "protocol": "saml",
+      "redirectUris": [
+        "http://localhost:8081/*",
+        "https://localhost:8081/*",
+        "http://saml-sp/*"
+      ],
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.force.post.binding": "true",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "true",
+        "saml.server.signature.keyinfo.ext": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "saml.onetimeuse.condition": "false",
+        "saml_force_name_id_format": "true",
+        "saml_name_id_format": "email",
+        "saml_signature_canonicalization_method": "http://www.w3.org/2001/10/xml-exc-c14n#"
+      }
+    },
+    {
+      "id": "oauth2-api-client",
+      "clientId": "oauth2-api-client",
+      "name": "OAuth2 API Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "oauth2-api-secret",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": ["web-origins", "role_list", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    }
+  ],
+  "users": [
+    {
+      "id": "test-user-1",
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testpass123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["offline_access", "uma_authorization"],
+      "clientRoles": {},
+      "groups": []
+    },
+    {
+      "id": "test-user-2", 
+      "username": "samluser",
+      "enabled": true,
+      "email": "samluser@example.com",
+      "firstName": "SAML",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "samlpass123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["offline_access", "uma_authorization"],
+      "clientRoles": {},
+      "groups": []
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "id": "api-user",
+        "name": "api-user",
+        "description": "API User Role",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "test-realm"
+      }
+    ]
+  },
+  "groups": [],
+  "defaultGroups": [],
+  "clientScopes": [
+    {
+      "id": "api-scope",
+      "name": "api-scope",
+      "description": "API Access Scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    }
+  ],
+  "defaultDefaultClientScopes": [
+    "role_list",
+    "profile",
+    "email",
+    "web-origins"
+  ],
+  "defaultOptionalClientScopes": [
+    "offline_access",
+    "address",
+    "phone",
+    "microprofile-jwt"
+  ]
+}

@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # Test runner container
+  test-runner:
+    build:
+      context: ./tests
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_USER: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      TEST_REALM: test-realm
+      OIDC_CLIENT_URL: http://oidc-client
+      SAML_SP_URL: http://saml-sp
+    volumes:
+      - ./tests:/app/tests
+      - ./test-results:/app/results
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-network
+    command: |
+      sh -c "
+        echo 'Waiting for Keycloak to be fully ready...'
+        sleep 30
+        echo 'Running authentication tests...'
+        python -m pytest tests/ -v --junitxml=results/test-results.xml --html=results/report.html --self-contained-html
+      "
+
+  # OIDC test client
+  oidc-test:
+    build:
+      context: ./tests/oidc
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      CLIENT_ID: oidc-test-client
+      CLIENT_SECRET: oidc-test-secret
+      REDIRECT_URI: http://oidc-client/callback
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-network
+    profiles:
+      - oidc-only
+
+  # SAML test client  
+  saml-test:
+    build:
+      context: ./tests/saml
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      SP_ENTITY_ID: saml-test-sp
+      ACS_URL: http://saml-sp/acs
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-network
+    profiles:
+      - saml-only
+
+  # OAuth2 client credentials test
+  oauth2-test:
+    build:
+      context: ./tests/oauth2
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      CLIENT_ID: oauth2-api-client
+      CLIENT_SECRET: oauth2-api-secret
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-network
+    profiles:
+      - oauth2-only
+
+  # Local user authentication test
+  local-auth-test:
+    build:
+      context: ./tests/local-auth
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      TEST_USERNAME: testuser
+      TEST_PASSWORD: testpass123
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-network
+    profiles:
+      - local-only
+
+volumes:
+  test-results:
+
+networks:
+  keycloak-network:
+    external: true
