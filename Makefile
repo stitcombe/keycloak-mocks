@@ -65,7 +65,7 @@ test: start
 
 test-oidc: start
 	@echo "Running OIDC authentication tests..."
-	docker compose -f docker compose.test.yml --profile oidc-only up --build --abort-on-container-exit oidc-test
+	docker compose -f docker-compose.test.yml --profile oidc-only up --build --abort-on-container-exit oidc-test
 
 test-saml: start
 	@echo "Running SAML authentication tests..."

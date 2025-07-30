@@ -116,7 +116,7 @@ Realm: test-realm
         authUrl.searchParams.set("client_id", CLIENT_ID);
         authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
         authUrl.searchParams.set("response_type", "code");
-        authUrl.searchParams.set("scope", "openid profile email");
+        authUrl.searchParams.set("scope", "openid");
         authUrl.searchParams.set("state", "test-state-" + Date.now());
 
         updateResults(`
