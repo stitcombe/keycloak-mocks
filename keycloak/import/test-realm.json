@@ -3,7 +3,7 @@
   "realm": "test-realm",
   "displayName": "Test Realm",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "none",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
@@ -109,8 +109,19 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
-      "defaultClientScopes": ["web-origins", "role_list", "profile", "roles", "email"],
-      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+      "defaultClientScopes": [
+        "web-origins",
+        "role_list",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
     }
   ],
   "users": [
@@ -133,7 +144,7 @@
       "groups": []
     },
     {
-      "id": "test-user-2", 
+      "id": "test-user-2",
       "username": "samluser",
       "enabled": true,
       "email": "samluser@example.com",

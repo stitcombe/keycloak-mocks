@@ -58,8 +58,8 @@
     <h2>Configuration</h2>
     <pre id="config">
 Client ID: oidc-test-client
-Redirect URI: https://localhost:8082/callback
-Keycloak URL: https://localhost
+Redirect URI: http://localhost:8082/callback
+Keycloak URL: http://localhost
 Realm: test-realm
 </pre
     >
@@ -71,7 +71,7 @@ Realm: test-realm
       const KEYCLOAK_URL = "http://localhost:8080";
       const REALM = "test-realm";
       const CLIENT_ID = "oidc-test-client";
-      const REDIRECT_URI = "https://localhost:8082/callback";
+      const REDIRECT_URI = "http://localhost:8082/callback";
 
       function updateStatus(message, type = "info") {
         const status = document.getElementById("status");

@@ -51,11 +51,11 @@ services:
 
   # Mock SAML Service Provider for testing
   saml-sp:
-    image: nginx:alpine
-    volumes:
-      - ./test-apps/saml-sp:/usr/share/nginx/html
+    build:
+      context: ./test-apps/saml-sp
+      dockerfile: Dockerfile
     ports:
-      - "8081:80"
+      - "8081:3000"
     networks:
       - keycloak-network
 
