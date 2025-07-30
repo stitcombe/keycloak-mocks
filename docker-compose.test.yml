@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Test runner container
   test-runner:
@@ -16,9 +14,6 @@ services:
     volumes:
       - ./tests:/app/tests
       - ./test-results:/app/results
-    depends_on:
-      keycloak:
-        condition: service_healthy
     networks:
       - keycloak-network
     command: |
@@ -39,15 +34,12 @@ services:
       CLIENT_ID: oidc-test-client
       CLIENT_SECRET: oidc-test-secret
       REDIRECT_URI: http://oidc-client/callback
-    depends_on:
-      keycloak:
-        condition: service_healthy
     networks:
       - keycloak-network
     profiles:
       - oidc-only
 
-  # SAML test client  
+  # SAML test client
   saml-test:
     build:
       context: ./tests/saml
@@ -56,9 +48,6 @@ services:
       KEYCLOAK_URL: http://keycloak:8080
       SP_ENTITY_ID: saml-test-sp
       ACS_URL: http://saml-sp/acs
-    depends_on:
-      keycloak:
-        condition: service_healthy
     networks:
       - keycloak-network
     profiles:
@@ -73,9 +62,6 @@ services:
       KEYCLOAK_URL: http://keycloak:8080
       CLIENT_ID: oauth2-api-client
       CLIENT_SECRET: oauth2-api-secret
-    depends_on:
-      keycloak:
-        condition: service_healthy
     networks:
       - keycloak-network
     profiles:
@@ -90,9 +76,6 @@ services:
       KEYCLOAK_URL: http://keycloak:8080
       TEST_USERNAME: testuser
       TEST_PASSWORD: testpass123
-    depends_on:
-      keycloak:
-        condition: service_healthy
     networks:
       - keycloak-network
     profiles:
@@ -103,4 +86,4 @@ volumes:
 
 networks:
   keycloak-network:
-    external: true
+    driver: bridge

@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>report.html</title>
+    <style>body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.log {
+  background-color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  height: 230px;
+  overflow-y: scroll;
+  padding: 5px;
+  white-space: pre-wrap;
+}
+.log:only-child {
+  height: inherit;
+}
+
+div.image {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.image img {
+  width: 320px;
+}
+
+div.video {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.video video {
+  overflow: hidden;
+  width: 320px;
+  height: 240px;
+}
+
+.collapsed {
+  display: none;
+}
+
+.expander::after {
+  content: " (show details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.collapser::after {
+  content: " (hide details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+
+.sort-icon {
+  font-size: 0px;
+  float: left;
+  margin-right: 5px;
+  margin-top: 5px;
+  /*triangle*/
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.inactive .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #E6E6E6;
+}
+.asc.active .sort-icon {
+  /*finish triangle*/
+  border-bottom: 8px solid #999;
+}
+.desc.active .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    let visibleString = getQueryParameter('visible') || 'all';
+    visibleString = visibleString.toLowerCase();
+    const checkedItems = visibleString.split(',');
+
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++) {
+        filterItems[i].hidden = false;
+
+        if (visibleString != 'all') {
+            filterItems[i].checked = checkedItems.includes(filterItems[i].getAttribute('data-test-result'));
+            filterTable(filterItems[i]);
+        }
+    }
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 30-Jul-2025 at 12:40:35 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.2.0</p>
+    <h2>Summary</h2>
+    <p>13 tests ran in 1.84 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">9 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">4 failed</span>, <input checked="true" class="filter" data-test-result="error" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">19 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_exists::setup</td>
+          <td class="col-duration">0.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb80b70d0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_login_direct_grant::setup</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb8067bd0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_invalid_credentials::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb80673d0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_disabled::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb8066e90&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_password_reset::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb80deb10&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_session_management::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb8c0c410&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_attributes::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb8c0d110&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_roles::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb8c0dcd0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_local_auth.py::TestLocalUserAuthentication::test_local_user_groups::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_local_auth.TestLocalUserAuthentication object at 0xffffb8c0e990&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, test_user_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=&#x27;oidc-test-client&#x27;,<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=&#x27;oidc-test-secret&#x27;<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_local_auth.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_client_exists_and_configured::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8171a50&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_client_credentials_grant::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8d2cb10&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_invalid_client_credentials::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8bec1d0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_client_credentials_token_validation::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8bf97d0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_client_credentials_scope_handling::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8c26290&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_client_credentials_token_lifetime::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8c27590&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_client_service_account::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8d53450&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_api_resource_access::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb8d3b290&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_token_revocation::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb964a6d0&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_oauth2_client_credentials.py::TestOAuth2ClientCredentials::test_concurrent_token_requests::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oauth2_client_credentials.TestOAuth2ClientCredentials object at 0xffffb9649450&gt;<br/>keycloak_config = {&#x27;admin_password&#x27;: &#x27;admin&#x27;, &#x27;admin_username&#x27;: &#x27;admin&#x27;, &#x27;realm_name&#x27;: &#x27;test-realm&#x27;, &#x27;server_url&#x27;: &#x27;http://keycloak:8080&#x27;}<br/>oauth2_client_config = {&#x27;client_id&#x27;: &#x27;oauth2-api-client&#x27;, &#x27;client_secret&#x27;: &#x27;oauth2-api-secret&#x27;}<br/><br/>    @pytest.fixture(autouse=True)<br/>    def setup(self, keycloak_config, oauth2_client_config):<br/>        self.keycloak_openid = KeycloakOpenID(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            client_id=oauth2_client_config[&#x27;client_id&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            client_secret_key=oauth2_client_config[&#x27;client_secret&#x27;]<br/>        )<br/>&gt;       self.keycloak_admin = KeycloakAdmin(<br/>            server_url=keycloak_config[&#x27;server_url&#x27;],<br/>            username=keycloak_config[&#x27;admin_username&#x27;],<br/>            password=keycloak_config[&#x27;admin_password&#x27;],<br/>            realm_name=keycloak_config[&#x27;realm_name&#x27;],<br/>            verify=False<br/>        )<br/><br/>tests/test_oauth2_client_credentials.py:21: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_admin.py:141: in __init__<br/>    self.connection = connection or KeycloakOpenIDConnection(<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:119: in __init__<br/>    self.get_token()<br/>/usr/local/lib/python3.11/site-packages/keycloak/openid_connection.py:320: in get_token<br/>    self.token = self.keycloak_openid.token(<br/>/usr/local/lib/python3.11/site-packages/keycloak/keycloak_openid.py:319: in token<br/>    return raise_error_from_response(data_raw, KeycloakPostError)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>response = &lt;Response [401]&gt;<br/>error = &lt;class &#x27;keycloak.exceptions.KeycloakAuthenticationError&#x27;&gt;<br/>expected_codes = [200, 201, 204], skip_exists = False<br/><br/>    def raise_error_from_response(response, error, expected_codes=None, skip_exists=False):<br/>        &quot;&quot;&quot;Raise an exception for the response.<br/>    <br/>        :param response: The response object<br/>        :type response: Response<br/>        :param error: Error object to raise<br/>        :type error: dict or Exception<br/>        :param expected_codes: Set of expected codes, which should not raise the exception<br/>        :type expected_codes: Sequence[int]<br/>        :param skip_exists: Indicates whether the response on already existing object should be ignored<br/>        :type skip_exists: bool<br/>    <br/>        :returns: Content of the response message<br/>        :type: bytes or dict<br/>        :raises KeycloakError: In case of unexpected status codes<br/>        &quot;&quot;&quot;  # noqa: DAR401,DAR402<br/>        if expected_codes is None:<br/>            expected_codes = [200, 201, 204]<br/>    <br/>        if response.status_code in expected_codes:<br/>            if response.status_code == requests.codes.no_content:<br/>                return {}<br/>    <br/>            try:<br/>                return response.json()<br/>            except ValueError:<br/>                return response.content<br/>    <br/>        if skip_exists and response.status_code == 409:<br/>            return {&quot;msg&quot;: &quot;Already exists&quot;}<br/>    <br/>        try:<br/>            message = response.json()[&quot;message&quot;]<br/>        except (KeyError, ValueError):<br/>            message = response.content<br/>    <br/>        if isinstance(error, dict):<br/>            error = error.get(response.status_code, KeycloakOperationError)<br/>        else:<br/>            if response.status_code == 401:<br/>                error = KeycloakAuthenticationError<br/>    <br/>&gt;       raise error(<br/>            error_message=message, response_code=response.status_code, response_body=response.content<br/>        )<br/><span class="error">E       keycloak.exceptions.KeycloakAuthenticationError: 401: b&#x27;{&quot;error&quot;:&quot;invalid_grant&quot;,&quot;error_description&quot;:&quot;Invalid user credentials&quot;}&#x27;</span><br/><br/>/usr/local/lib/python3.11/site-packages/keycloak/exceptions.py:192: KeycloakAuthenticationError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_well_known_configuration</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oidc_auth.TestOIDCAuthentication object at 0xffffb8c091d0&gt;<br/><br/>    def test_oidc_well_known_configuration(self):<br/>        &quot;&quot;&quot;Test OIDC well-known configuration endpoint&quot;&quot;&quot;<br/>        well_known_url = f&quot;{self.config[&#x27;server_url&#x27;]}/realms/{self.config[&#x27;realm_name&#x27;]}/.well-known/openid_configuration&quot;<br/>        response = requests.get(well_known_url)<br/>    <br/>&gt;       assert response.status_code == 200<br/><span class="error">E       assert 404 == 200</span><br/><span class="error">E        +  where 404 = &lt;Response [404]&gt;.status_code</span><br/><br/>tests/test_oidc_auth.py:27: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_authorization_code_flow</td>
+          <td class="col-duration">0.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_oidc_auth.TestOIDCAuthentication object at 0xffffb8c09650&gt;<br/>test_user_config = {&#x27;email&#x27;: &#x27;testuser@example.com&#x27;, &#x27;password&#x27;: &#x27;testpass123&#x27;, &#x27;username&#x27;: &#x27;testuser&#x27;}<br/><br/>    def test_oidc_authorization_code_flow(self, test_user_config):<br/>        &quot;&quot;&quot;Test OIDC Authorization Code Flow&quot;&quot;&quot;<br/>        # Step 1: Get authorization URL<br/>        auth_url = self.keycloak_openid.auth_url(<br/>            redirect_uri=self.config[&#x27;redirect_uri&#x27;],<br/>            scope=&quot;openid profile email&quot;<br/>        )<br/>    <br/>        assert auth_url.startswith(f&quot;{self.config[&#x27;server_url&#x27;]}/realms/{self.config[&#x27;realm_name&#x27;]}/protocol/openid-connect/auth&quot;)<br/>    <br/>        # Step 2: Simulate user login and get authorization code<br/>        # This would normally involve browser interaction<br/>        session = requests.Session()<br/>    <br/>        # Get login page<br/>        response = session.get(auth_url)<br/>        assert response.status_code == 200<br/>    <br/>        # Extract form data<br/>        from lxml import html<br/>        tree = html.fromstring(response.content)<br/>&gt;       form_action = tree.xpath(&#x27;//form[@id=&quot;kc-form-login&quot;]/@action&#x27;)[0]<br/><span class="error">E       IndexError: list index out of range</span><br/><br/>tests/test_oidc_auth.py:60: IndexError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_saml_auth.py::TestSAMLAuthentication::test_saml_metadata_endpoint</td>
+          <td class="col-duration">0.03</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_saml_auth.TestSAMLAuthentication object at 0xffffb7fffa10&gt;<br/><br/>    def test_saml_metadata_endpoint(self):<br/>        &quot;&quot;&quot;Test SAML Identity Provider metadata endpoint&quot;&quot;&quot;<br/>        metadata_url = f&quot;{self.keycloak_url}/realms/{self.realm}/protocol/saml/descriptor&quot;<br/>        response = requests.get(metadata_url)<br/>    <br/>        assert response.status_code == 200<br/>&gt;       assert &#x27;application/samlmetadata+xml&#x27; in response.headers.get(&#x27;Content-Type&#x27;, &#x27;&#x27;)<br/><span class="error">E       AssertionError: assert &#x27;application/samlmetadata+xml&#x27; in &#x27;application/xml;charset=UTF-8&#x27;</span><br/><span class="error">E        +  where &#x27;application/xml;charset=UTF-8&#x27; = &lt;bound method Mapping.get of {&#x27;content-length&#x27;: &#x27;3454&#x27;, &#x27;Cache-Control&#x27;: &#x27;no-cache&#x27;, &#x27;Content-Type&#x27;: &#x27;application/xml;charset=UTF-8&#x27;, &#x27;Referrer-Policy&#x27;: &#x27;no-referrer&#x27;, &#x27;Strict-Transport-Security&#x27;: &#x27;max-age=31536000; includeSubDomains&#x27;, &#x27;X-Content-Type-Options&#x27;: &#x27;nosniff&#x27;, &#x27;X-Frame-Options&#x27;: &#x27;SAMEORIGIN&#x27;, &#x27;X-XSS-Protection&#x27;: &#x27;1; mode=block&#x27;}&gt;(&#x27;Content-Type&#x27;, &#x27;&#x27;)</span><br/><span class="error">E        +    where &lt;bound method Mapping.get of {&#x27;content-length&#x27;: &#x27;3454&#x27;, &#x27;Cache-Control&#x27;: &#x27;no-cache&#x27;, &#x27;Content-Type&#x27;: &#x27;application/xml;charset=UTF-8&#x27;, &#x27;Referrer-Policy&#x27;: &#x27;no-referrer&#x27;, &#x27;Strict-Transport-Security&#x27;: &#x27;max-age=31536000; includeSubDomains&#x27;, &#x27;X-Content-Type-Options&#x27;: &#x27;nosniff&#x27;, &#x27;X-Frame-Options&#x27;: &#x27;SAMEORIGIN&#x27;, &#x27;X-XSS-Protection&#x27;: &#x27;1; mode=block&#x27;}&gt; = {&#x27;content-length&#x27;: &#x27;3454&#x27;, &#x27;Cache-Control&#x27;: &#x27;no-cache&#x27;, &#x27;Content-Type&#x27;: &#x27;application/xml;charset=UTF-8&#x27;, &#x27;Referrer-Policy&#x27;: &#x27;no-referrer&#x27;, &#x27;Strict-Transport-Security&#x27;: &#x27;max-age=31536000; includeSubDomains&#x27;, &#x27;X-Content-Type-Options&#x27;: &#x27;nosniff&#x27;, &#x27;X-Frame-Options&#x27;: &#x27;SAMEORIGIN&#x27;, &#x27;X-XSS-Protection&#x27;: &#x27;1; mode=block&#x27;}.get</span><br/><span class="error">E        +      where {&#x27;content-length&#x27;: &#x27;3454&#x27;, &#x27;Cache-Control&#x27;: &#x27;no-cache&#x27;, &#x27;Content-Type&#x27;: &#x27;application/xml;charset=UTF-8&#x27;, &#x27;Referrer-Policy&#x27;: &#x27;no-referrer&#x27;, &#x27;Strict-Transport-Security&#x27;: &#x27;max-age=31536000; includeSubDomains&#x27;, &#x27;X-Content-Type-Options&#x27;: &#x27;nosniff&#x27;, &#x27;X-Frame-Options&#x27;: &#x27;SAMEORIGIN&#x27;, &#x27;X-XSS-Protection&#x27;: &#x27;1; mode=block&#x27;} = &lt;Response [200]&gt;.headers</span><br/><br/>tests/test_saml_auth.py:25: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_saml_auth.py::TestSAMLAuthentication::test_saml_logout_slo</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_saml_auth.TestSAMLAuthentication object at 0xffffb7ffd710&gt;<br/><br/>    def test_saml_logout_slo(self):<br/>        &quot;&quot;&quot;Test SAML Single Logout (SLO)&quot;&quot;&quot;<br/>        # Create SAML LogoutRequest<br/>        logout_request = self._create_saml_logout_request()<br/>    <br/>        # Encode for HTTP-Redirect binding<br/>        compressed = zlib.compress(logout_request.encode(&#x27;utf-8&#x27;))[2:-4]<br/>        encoded = base64.b64encode(compressed).decode(&#x27;utf-8&#x27;)<br/>    <br/>        # Build SLO URL<br/>        slo_url = f&quot;{self.keycloak_url}/realms/{self.realm}/protocol/saml&quot;<br/>        params = {<br/>            &#x27;SAMLRequest&#x27;: encoded,<br/>            &#x27;RelayState&#x27;: &#x27;test-logout-relay-state&#x27;<br/>        }<br/>    <br/>        response = requests.get(slo_url, params=params)<br/>    <br/>        # Should handle logout request (may redirect or return SAML response)<br/>&gt;       assert response.status_code in [200, 302]<br/><span class="error">E       assert 500 in [200, 302]</span><br/><span class="error">E        +  where 500 = &lt;Response [500]&gt;.status_code</span><br/><br/>tests/test_saml_auth.py:167: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_client_credentials_flow</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>⚠ Client Credentials not enabled for this client: 401: b&#x27;{&quot;error&quot;:&quot;unauthorized_client&quot;,&quot;error_description&quot;:&quot;Client not enabled to retrieve service account&quot;}&#x27;
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_token_introspection</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>⚠ Token Introspection test failed: 401: b&#x27;{&quot;error&quot;:&quot;unauthorized_client&quot;,&quot;error_description&quot;:&quot;Client not enabled to retrieve service account&quot;}&#x27;
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_userinfo_endpoint</td>
+          <td class="col-duration">0.37</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>⚠ UserInfo test failed (Direct Access Grants may be disabled): assert &#x27;email&#x27; in {&#x27;sub&#x27;: &#x27;test-user-1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_logout</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>⚠ Logout test failed: 401: b&#x27;{&quot;error&quot;:&quot;unauthorized_client&quot;,&quot;error_description&quot;:&quot;Client not enabled to retrieve service account&quot;}&#x27;
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_oidc_auth.py::TestOIDCAuthentication::test_oidc_jwks_endpoint</td>
+          <td class="col-duration">0.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>✓ OIDC JWKS endpoint accessible with 2 keys
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_saml_auth.py::TestSAMLAuthentication::test_saml_sso_redirect_binding</td>
+          <td class="col-duration">0.27</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>✓ SAML SSO Redirect binding initiated successfully
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_saml_auth.py::TestSAMLAuthentication::test_saml_sso_post_binding</td>
+          <td class="col-duration">0.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>✓ SAML SSO POST binding initiated successfully
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_saml_auth.py::TestSAMLAuthentication::test_saml_login_flow</td>
+          <td class="col-duration">0.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>⚠ SAML login flow test requires manual verification
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_saml_auth.py::TestSAMLAuthentication::test_saml_signature_validation</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>✓ SAML signing certificates available (1 found)
+<br/></div></td></tr></tbody></table></body></html>
